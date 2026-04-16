@@ -80,7 +80,9 @@ protected:
    * @brief Callback invoked when a goal is received and before the tree is created.
    * If it returns false, the goal will be rejected.
   */
-  virtual bool onGoalReceived(const std::string& tree_name, const std::string& payload)
+  // -> tree_execution_server.cpp에서 호출. 입력을 goal->target_tree, goal->payload 로 받음
+  virtual bool onGoalReceived([[maybe_unused]] const std::string& tree_name,
+                              [[maybe_unused]] const std::string& payload)
   {
     return true;
   }
@@ -91,7 +93,9 @@ protected:
    *
    * @param tree The tree that was created
   */
-  virtual void onTreeCreated(BT::Tree& tree)
+  // -> tree_execution_server.cpp에서 호출. 입력을 p_->tree 로 받음
+  // -> sample_bt_executor.cpp 파일에서 사용자 정의 클래스에서 오버라이딩 함.
+  virtual void onTreeCreated([[maybe_unused]] BT::Tree& tree)
   {}
 
   /**
@@ -101,7 +105,8 @@ protected:
    *
    * @param factory The factory to use to register nodes
   */
-  virtual void registerNodesIntoFactory(BT::BehaviorTreeFactory& factory)
+  // -> tree_execution_server.cpp에서 호출. 입력을 p_->factory 로 받음
+  virtual void registerNodesIntoFactory([[maybe_unused]] BT::BehaviorTreeFactory& factory)
   {}
 
   /**
@@ -111,7 +116,8 @@ protected:
    *
    * @param status The status of the tree after the last tick
   */
-  virtual std::optional<BT::NodeStatus> onLoopAfterTick(BT::NodeStatus status)
+  // -> tree_execution_server.cpp에서 호출. 입력을 status 로 받음
+  virtual std::optional<BT::NodeStatus> onLoopAfterTick([[maybe_unused]] BT::NodeStatus status)
   {
     return std::nullopt;
   }
@@ -125,8 +131,10 @@ protected:
    *
    * @return if not std::nullopt, the string will be sent as [return_message] to the Action Client.
   */
-  virtual std::optional<std::string> onTreeExecutionCompleted(BT::NodeStatus status,
-                                                              bool was_cancelled)
+  // -> tree_execution_server.cpp에서 호출. 입력을 status, flase/true 로 받음
+  // -> sample_bt_executor.cpp 파일에서 사용자 정의 클래스에서 오버라이딩 함.
+  virtual std::optional<std::string> onTreeExecutionCompleted([[maybe_unused]] BT::NodeStatus status,
+                                                              [[maybe_unused]] bool was_cancelled)
   {
     return std::nullopt;
   }

@@ -25,18 +25,27 @@ namespace BT
 btcpp_ros2_interfaces::msg::NodeStatus ConvertNodeStatus(BT::NodeStatus& status)
 {
   btcpp_ros2_interfaces::msg::NodeStatus action_status;
+  // switch 문에서 case 블록이 break 없이 다음 case로 넘어가는 것을 방지하기 위해 명시적으로 break 추가
   switch(status)
   {
     case BT::NodeStatus::RUNNING:
       action_status.status = btcpp_ros2_interfaces::msg::NodeStatus::RUNNING;
+      break;
     case BT::NodeStatus::SUCCESS:
       action_status.status = btcpp_ros2_interfaces::msg::NodeStatus::SUCCESS;
+      break;
     case BT::NodeStatus::FAILURE:
       action_status.status = btcpp_ros2_interfaces::msg::NodeStatus::FAILURE;
+      break;
     case BT::NodeStatus::IDLE:
       action_status.status = btcpp_ros2_interfaces::msg::NodeStatus::IDLE;
+      break;
     case BT::NodeStatus::SKIPPED:
       action_status.status = btcpp_ros2_interfaces::msg::NodeStatus::SKIPPED;
+      break;
+    default:
+      // 필요하다면 기본값 설정 또는 예외 처리
+      break;
   }
 
   return action_status;
@@ -154,8 +163,10 @@ void RegisterPlugins(bt_server::Params& params, BT::BehaviorTreeFactory& factory
   }
 }
 
+// [Unused var] 'node' 제거
+// -> tree_execution_server.cpp에서 호출. 입력을 node_ 로 받음
 void RegisterBehaviorTrees(bt_server::Params& params, BT::BehaviorTreeFactory& factory,
-                           rclcpp::Node::SharedPtr node)
+                           [[maybe_unused]] rclcpp::Node::SharedPtr node)
 {
   for(const auto& tree_dir : params.behavior_trees)
   {

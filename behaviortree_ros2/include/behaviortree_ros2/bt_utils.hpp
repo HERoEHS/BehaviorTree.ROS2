@@ -16,7 +16,8 @@
 #include <thread>
 
 // auto-generated header, created by generate_parameter_library
-#include "bt_executor_parameters.hpp"
+//#include "bt_executor_parameters.hpp"
+#include "behaviortree_ros2/bt_executor_parameters.hpp"
 
 #include "btcpp_ros2_interfaces/msg/node_status.hpp"
 
@@ -83,6 +84,6 @@ void RegisterPlugins(bt_server::Params& params, BT::BehaviorTreeFactory& factory
  * @param node node pointer that is shared with the ROS based Behavior plugins
  */
 void RegisterBehaviorTrees(bt_server::Params& params, BT::BehaviorTreeFactory& factory,
-                           rclcpp::Node::SharedPtr node);
+                           [[maybe_unused]] rclcpp::Node::SharedPtr node);
 
 }  // namespace BT

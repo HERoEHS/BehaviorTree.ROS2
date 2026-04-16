@@ -383,6 +383,7 @@ inline NodeStatus RosActionNode<T>::tick()
 
     goal_received_ = false;
     future_goal_handle_ = {};
+    goal_handle_.reset();
     on_feedback_state_change_ = NodeStatus::RUNNING;
     result_ = {};
 
@@ -408,6 +409,11 @@ inline NodeStatus RosActionNode<T>::tick()
         };
     //--------------------
     goal_options.result_callback = [this](const WrappedResult& result) {
+      if(!goal_handle_)
+      {
+        RCLCPP_DEBUG(logger(), "result_callback received before goal_handle is available");
+        return;
+      }
       if(goal_handle_->get_goal_id() == result.goal_id)
       {
         RCLCPP_DEBUG(logger(), "result_callback");
@@ -488,6 +494,8 @@ inline NodeStatus RosActionNode<T>::tick()
     // THIRD case: result received, requested a stop
     if(result_.code != rclcpp_action::ResultCode::UNKNOWN)
     {
+      auto result = result_;
+      goal_handle_.reset();
       if(result_.code == rclcpp_action::ResultCode::ABORTED)
       {
         return CheckStatus(onFailure(ACTION_ABORTED));
@@ -498,7 +506,7 @@ inline NodeStatus RosActionNode<T>::tick()
       }
       else
       {
-        return CheckStatus(onResultReceived(result_));
+        return CheckStatus(onResultReceived(result));
       }
     }
   }
@@ -510,7 +518,15 @@ inline void RosActionNode<T>::halt()
 {
   if(status() == BT::NodeStatus::RUNNING)
   {
-    cancelGoal();
+    try
+    {
+      cancelGoal();
+    }
+    catch(const std::exception& ex)
+    {
+      RCLCPP_WARN(logger(), "Exception while canceling goal in halt() for [%s]: %s",
+                  action_name_.c_str(), ex.what());
+    }
     onHalt();
   }
 }
@@ -546,22 +562,38 @@ inline void RosActionNode<T>::cancelGoal()
 
   auto& action_client = client_instance_->action_client;
 
-  auto future_result = action_client->async_get_result(goal_handle_);
-  auto future_cancel = action_client->async_cancel_goal(goal_handle_);
-
-  constexpr auto SUCCESS = rclcpp::FutureReturnCode::SUCCESS;
-
-  if(executor.spin_until_future_complete(future_cancel, server_timeout_) != SUCCESS)
+  try
   {
-    RCLCPP_ERROR(logger(), "Failed to cancel action server for [%s]",
-                 action_name_.c_str());
+    auto future_result = action_client->async_get_result(goal_handle_);
+    auto future_cancel = action_client->async_cancel_goal(goal_handle_);
+
+    constexpr auto SUCCESS = rclcpp::FutureReturnCode::SUCCESS;
+
+    if(executor.spin_until_future_complete(future_cancel, server_timeout_) != SUCCESS)
+    {
+      RCLCPP_ERROR(logger(), "Failed to cancel action server for [%s]",
+                   action_name_.c_str());
+    }
+
+    if(executor.spin_until_future_complete(future_result, server_timeout_) != SUCCESS)
+    {
+      RCLCPP_ERROR(logger(), "Failed to get result call failed :( for [%s]",
+                   action_name_.c_str());
+    }
+  }
+  catch(const rclcpp_action::exceptions::UnknownGoalHandleError& ex)
+  {
+    RCLCPP_WARN(logger(), "Ignoring stale/unknown goal handle while canceling [%s]: %s",
+                action_name_.c_str(), ex.what());
+  }
+  catch(const std::exception& ex)
+  {
+    RCLCPP_WARN(logger(), "Exception while canceling [%s]: %s",
+                action_name_.c_str(), ex.what());
   }
 
-  if(executor.spin_until_future_complete(future_result, server_timeout_) != SUCCESS)
-  {
-    RCLCPP_ERROR(logger(), "Failed to get result call failed :( for [%s]",
-                 action_name_.c_str());
-  }
+  goal_handle_.reset();
+  future_goal_handle_ = {};
 }
 
 }  // namespace BT
