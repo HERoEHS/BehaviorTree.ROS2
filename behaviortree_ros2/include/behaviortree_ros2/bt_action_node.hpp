@@ -243,8 +243,11 @@ template <class T>
 RosActionNode<T>::ActionClientInstance::ActionClientInstance(
     std::shared_ptr<rclcpp::Node> node, const std::string& action_name)
 {
-  callback_group =
-      node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  // automatically_add_to_executor_with_node=false 필수:
+  // true(기본값)면 메인 MultiThreadedExecutor의 add_node()가 이 그룹을 함께 가져가
+  // 전용 callback_executor와 이중 소유가 되어 goal 응답 처리 레이스가 발생할 수 있음
+  callback_group = node->create_callback_group(
+      rclcpp::CallbackGroupType::MutuallyExclusive, false);
   callback_executor.add_callback_group(callback_group, node->get_node_base_interface());
   action_client = rclcpp_action::create_client<T>(node, action_name, callback_group);
 }
@@ -455,7 +458,10 @@ inline NodeStatus RosActionNode<T>::tick()
     // FIRST case: check if the goal request has a timeout
     if(!goal_received_)
     {
-      auto nodelay = std::chrono::milliseconds(0);
+      // 0ms 사용 금지: nav2 navigate_to_pose에서 0ms spin은 goal 수락 응답을
+      // drain하지 못해 goal_received_가 영원히 false로 남는 업스트림 버그 존재
+      // (BehaviorTree.ROS2 issue #76). 10ms가 커뮤니티 공인 수정값.
+      auto nodelay = std::chrono::milliseconds(10);
       auto timeout =
           rclcpp::Duration::from_seconds(double(server_timeout_.count()) / 1000);
 
@@ -465,6 +471,15 @@ inline NodeStatus RosActionNode<T>::tick()
       {
         if((now() - time_goal_sent_) > timeout)
         {
+          // 서버가 이미 goal을 수락해 실행 중일 수 있음 (응답만 미처리된 경우).
+          // cancel 없이 FAILURE만 리턴하면 서버에 고아 goal이 남아
+          // 로봇이 계속 주행하므로 반드시 취소 시도 후 실패 처리.
+          // cancelGoal()은 future_goal_handle_ pending 케이스를 자체 처리함.
+          RCLCPP_ERROR(logger(),
+                       "[%s] Goal response not received within server_timeout (%ld ms). "
+                       "Canceling potentially-accepted goal before returning FAILURE.",
+                       name().c_str(), static_cast<long>(server_timeout_.count()));
+          cancelGoal();
           return CheckStatus(onFailure(SEND_GOAL_TIMEOUT));
         }
         else
