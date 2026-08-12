@@ -453,7 +453,14 @@ inline NodeStatus RosActionNode<T>::tick()
   if(status() == NodeStatus::RUNNING)
   {
     std::unique_lock<std::mutex> lock(getMutex());
-    client_instance_->callback_executor.spin_some();
+    // spin_some() 은 한 번의 wait 로 모인 것만 실행한다. rclcpp_action 클라이언트는
+    // Waitable 하나로 (feedback / status / goal 응답 / cancel / result) 를 모두
+    // 나르는데 실행 1회당 한 종류만 처리하고, 그 순서에서 feedback 이 앞선다.
+    // 그래서 피드백이 계속 오는 액션(예: 장거리 nav2 주행)에서는 goal 응답이
+    // 매 tick 뒤로 밀려 영영 처리되지 않고 SEND_GOAL_TIMEOUT 이 난다 —
+    // 서버는 goal 을 받아 끝까지 수행하는데 클라이언트만 실패로 끝난다(실측).
+    // spin_all 은 남은 일이 없을 때까지 반복 수집·실행하므로 그 굶주림이 없다.
+    client_instance_->callback_executor.spin_all(std::chrono::milliseconds(2));
 
     // FIRST case: check if the goal request has a timeout
     if(!goal_received_)
