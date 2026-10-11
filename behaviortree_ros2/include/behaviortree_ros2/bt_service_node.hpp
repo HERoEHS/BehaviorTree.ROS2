@@ -112,6 +112,15 @@ public:
 
   NodeStatus tick() override;
 
+  // BT를 진행시키지 않고 응답만 처리한다. tick과 같은 스레드에서 호출한다.
+  bool pollResponse()
+  {
+    if(status() != NodeStatus::RUNNING || !srv_instance_ || !future_response_.valid())
+      return false;
+    srv_instance_->callback_executor.spin_all(std::chrono::milliseconds(2));
+    return future_response_.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
+  }
+
   /// The default halt() implementation.
   void halt() override;
 

@@ -427,7 +427,14 @@ inline NodeStatus RosActionNode<T>::tick()
     //--------------------
     goal_options.goal_response_callback =
         [this](typename GoalHandle::SharedPtr const future_handle) {
-          auto goal_handle_ = future_handle.get();
+          // 중단한 이전 요청의 늦은 수락이 새 목표의 핸들을 덮어쓰지 않게 현재 응답인지 확인한다.
+          if(!future_goal_handle_.valid() ||
+             future_goal_handle_.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready ||
+             future_goal_handle_.get() != future_handle)
+            return;
+          // 즉시 끝나는 목표의 결과가 같은 콜백 처리 중에 와도 수락된 목표를 먼저 기억한다.
+          goal_handle_ = future_handle;
+          emitWakeUpSignal();
           if(!goal_handle_)
           {
             RCLCPP_ERROR(logger(), "Goal was rejected by server");
