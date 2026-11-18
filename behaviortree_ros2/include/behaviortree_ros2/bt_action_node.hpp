@@ -171,6 +171,12 @@ public:
   void setActionName(const std::string& action_name);
 
 protected:
+  /// Server result for the current goal in onFailure(ACTION_ABORTED/ACTION_CANCELLED).
+  const WrappedResult& receivedResult() const
+  {
+    return result_;
+  }
+
   struct ActionClientInstance
   {
     ActionClientInstance(std::shared_ptr<rclcpp::Node> node,
